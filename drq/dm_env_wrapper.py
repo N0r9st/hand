@@ -19,7 +19,8 @@ def make_env(env_name: str,
              image_size: int = 84,
              sticky: bool = False,
              gray_scale: bool = False,
-             flatten: bool = True) -> gym.Env:
+             flatten: bool = True,
+             video_every: int = 1) -> gym.Env:
     # Check if the env is in gym.
     all_envs = gym.envs.registry.all()
     
@@ -65,7 +66,7 @@ def make_env(env_name: str,
 
     if save_folder is not None:
         # env = gym.wrappers.RecordVideo(env, save_folder)
-        env = wrappers.VideoRecorder(env, save_folder, 10, True)
+        env = wrappers.VideoRecorder(env, save_folder, video_every, True)
 
     if frame_stack > 1:
         env = wrappers.FrameStack(env, num_stack=frame_stack)

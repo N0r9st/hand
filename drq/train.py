@@ -1,3 +1,4 @@
+import subprocess
 import os
 import random
 import glob 
@@ -76,7 +77,7 @@ def main(_):
     gray_scale = kwargs.pop('gray_scale')
     image_size = kwargs.pop('image_size')
 
-    def make_pixel_env(seed, video_folder):
+    def make_pixel_env(seed, video_folder, video_every):
         return make_env(FLAGS.env_name,
                         seed,
                         video_folder,
@@ -84,10 +85,11 @@ def main(_):
                         image_size=image_size,
                         frame_stack=3,
                         from_pixels=True,
-                        gray_scale=gray_scale)
+                        gray_scale=gray_scale,
+                        video_every=video_every)
 
-    env = make_pixel_env(FLAGS.seed, video_train_folder)
-    eval_env = make_pixel_env(FLAGS.seed + 42, video_eval_folder)
+    env = make_pixel_env(FLAGS.seed, video_train_folder, 10)
+    eval_env = make_pixel_env(FLAGS.seed + 42, video_eval_folder, FLAGS.eval_episodes)
 
     np.random.seed(FLAGS.seed)
     random.seed(FLAGS.seed)
@@ -145,7 +147,16 @@ def main(_):
                 vid_paths = sorted(
                     vid_paths, key=lambda x: int(os.path.basename(x).split(".")[0])
                 )
-                if vid_paths: wandb.log({"video": wandb.Video(vid_paths[-1], fps=24, format="mp4")})
+                if vid_paths: wandb.log({"eval_video": wandb.Video(vid_paths[-1], fps=24, format="mp4")})
+
+                vid_paths = glob.glob(os.path.join(video_train_folder, "*.mp4"))
+                vid_paths = sorted(
+                    vid_paths, key=lambda x: int(os.path.basename(x).split(".")[0])
+                )
+                if vid_paths: wandb.log({"train_video": wandb.Video(vid_paths[-1], fps=24, format="mp4")})
+
+                subprocess.run(["rm", os.path.join(video_eval_folder, "*.mp4")])
+                subprocess.run(["rm", os.path.join(video_train_folder, "*.mp4")])
 
             eval_returns.append(
                 (info['total']['timesteps'], eval_stats['return']))
