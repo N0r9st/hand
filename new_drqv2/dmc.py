@@ -181,8 +181,8 @@ def make(name, frame_stack, action_repeat, seed, height=84, width=84):
     # overwrite cup to ball_in_cup
     # domain = dict(cup='ball_in_cup').get(domain, domain)
     # make sure reward is not visualized
-    print(domain, task)
-    print(suite.ALL_TASKS)
+    # print(domain, task)
+    # print(suite.ALL_TASKS)
     if (domain, task) in suite.ALL_TASKS:
         env = suite.load(domain,
                          task,

@@ -7,6 +7,8 @@ import numpy as np
 import tqdm
 from absl import app, flags
 from ml_collections import config_flags
+import wandb
+
 
 from drq.learner import DrQLearner
 from drq.buffer import ReplayBuffer
@@ -18,8 +20,9 @@ from drq.dm_env_wrapper import make_env
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('env_name', 'cheetah-run', 'Environment name.')
-flags.DEFINE_string('save_dir', './tmp/', 'Tensorboard logging dir.')
+# flags.DEFINE_string('env_name', 'cheetah-run', 'Environment name.')
+flags.DEFINE_string('env_name', 'reach-duplo', 'Environment name.')
+flags.DEFINE_string('save_dir', './savings/', 'Dir with whatever is saved during run')
 flags.DEFINE_integer('seed', 42, 'Random seed.')
 flags.DEFINE_integer('eval_episodes', 10,
                      'Number of episodes used for evaluation.')
@@ -34,6 +37,7 @@ flags.DEFINE_integer(
     'Action repeat, if None, uses 2 or PlaNet default values.')
 flags.DEFINE_boolean('tqdm', True, 'Use tqdm progress bar.')
 flags.DEFINE_boolean('save_video', True, 'Save videos during evaluation.')
+flags.DEFINE_boolean('use_wandb', False, 'Save videos during evaluation.')
 config_flags.DEFINE_config_file(
     'config',
     'drq/drq_config.py',
@@ -46,15 +50,16 @@ PLANET_ACTION_REPEAT = {
     'cheetah-run': 4,
     'finger-spin': 2,
     'ball_in_cup-catch': 4,
-    'walker-walk': 2
+    'walker-walk': 2,
+    "reach-duplo": 2,
 }
 
 
 def main(_):
     
     if FLAGS.save_video:
-        video_train_folder = os.path.join(FLAGS.save_dir, 'savings', 'train')
-        video_eval_folder = os.path.join(FLAGS.save_dir, 'savings', 'eval')
+        video_train_folder = os.path.join(FLAGS.save_dir, 'vids', 'train')
+        video_eval_folder = os.path.join(FLAGS.save_dir, 'vids', 'eval')
     else:
         video_train_folder = None
         video_eval_folder = None
@@ -97,8 +102,8 @@ def main(_):
     eval_returns = []
     observation, done = env.reset(), False
 
-    import wandb
-    wandb.init(project='drq_test', config=FLAGS)
+    if FLAGS.use_wandb:
+        wandb.init(project='drq_test', config=FLAGS)
 
     for i in tqdm.tqdm(range(1, FLAGS.max_steps // action_repeat + 1),
                        smoothing=0.1,
@@ -120,30 +125,22 @@ def main(_):
 
         if done:
             observation, done = env.reset(), False
-            # for k, v in info['episode'].items():
-            #     summary_writer.add_scalar(f'training/{k}', v,
-            #                               info['total']['timesteps'])
-
-            wandb.log({f'training/{k}': v for k, v in info['episode'].items()})
+            if FLAGS.use_wandb:
+                wandb.log({f'training/{k}': v for k, v in info['episode'].items()})
 
         if i >= FLAGS.start_training:
             batch = replay_buffer.sample(FLAGS.batch_size)
             update_info = agent.update(batch)
 
             if i % FLAGS.log_interval == 0:
-                # for k, v in update_info.items():
-                #     summary_writer.add_scalar(f'training/{k}', v, i)
-                # summary_writer.flush()
-                wandb.log({f'training/{k}': v for k, v in update_info.items()})
+                if FLAGS.use_wandb:
+                    wandb.log({f'training/{k}': v for k, v in update_info.items()})
 
 
         if i % FLAGS.eval_interval == 0:
             eval_stats = evaluate(agent, eval_env, FLAGS.eval_episodes)
-
-            # for k, v in eval_stats.items():
-            #     summary_writer.add_scalar(f'evaluation/average_{k}s', v, info['total']['timesteps'])
-            # summary_writer.flush()
-            wandb.log({f'evaluation/{k}': v for k, v in eval_stats.items()})
+            if FLAGS.use_wandb:
+                wandb.log({f'evaluation/{k}': v for k, v in eval_stats.items()})
 
             eval_returns.append(
                 (info['total']['timesteps'], eval_stats['return']))

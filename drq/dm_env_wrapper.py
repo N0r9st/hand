@@ -1,3 +1,5 @@
+from curses import wrapper
+from textwrap import wrap
 from typing import Optional
 
 import gym
@@ -20,8 +22,8 @@ def make_env(env_name: str,
              flatten: bool = True) -> gym.Env:
     # Check if the env is in gym.
     all_envs = gym.envs.registry.all()
+    
     env_ids = [env_spec.id for env_spec in all_envs]
-
     if env_name in env_ids:
         env = gym.make(env_name)
     else:
@@ -40,9 +42,6 @@ def make_env(env_name: str,
         env = wrappers.RepeatAction(env, action_repeat)
 
     env = RescaleAction(env, -1.0, 1.0)
-
-    if save_folder is not None:
-        env = gym.wrappers.RecordVideo(env, save_folder)
 
     if from_pixels:
         if env_name in env_ids:
@@ -63,6 +62,10 @@ def make_env(env_name: str,
             env = wrappers.RGB2Gray(env)
     else:
         env = wrappers.SinglePrecision(env)
+
+    if save_folder is not None:
+        # env = gym.wrappers.RecordVideo(env, save_folder)
+        env = wrappers.VideoRecorder(env, save_folder, 10, True)
 
     if frame_stack > 1:
         env = wrappers.FrameStack(env, num_stack=frame_stack)

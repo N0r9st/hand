@@ -7,7 +7,7 @@ from typing import Dict, Optional, OrderedDict
 
 import dm_env
 import numpy as np
-from dm_control import suite
+from dm_control import suite, manipulation
 from gym import core, spaces
 
 
@@ -18,8 +18,15 @@ def dmc_spec2gym_space(spec):
             spec[k] = dmc_spec2gym_space(v)
         return spaces.Dict(spec)
     elif isinstance(spec, dm_env.specs.BoundedArray):
-        return spaces.Box(low=spec.minimum,
-                          high=spec.maximum,
+        spec_min = spec.minimum
+        if isinstance(spec.minimum, np.ndarray) and spec.minimum.size==1:
+            spec_min = spec_min.item()
+
+        spec_max = spec.maximum
+        if isinstance(spec.maximum, np.ndarray) and spec.maximum.size==1:
+            spec_max = spec_max.item()
+        return spaces.Box(low=spec_min,
+                          high=spec_max,
                           shape=spec.shape,
                           dtype=spec.dtype)
     elif isinstance(spec, dm_env.specs.Array):
@@ -46,14 +53,18 @@ class DMCEnv(core.Env):
         ), 'You must provide either an environment or domain and task names.'
 
         if env is None:
-            env = suite.load(domain_name=domain_name,
-                             task_name=task_name,
-                             task_kwargs=task_kwargs,
-                             environment_kwargs=environment_kwargs)
+            if (domain_name, task_name) in suite.ALL_TASKS:
+                env = suite.load(domain_name=domain_name,
+                                task_name=task_name,
+                                task_kwargs=task_kwargs,
+                                environment_kwargs=environment_kwargs)
+            else:
+                name = f'{domain_name}_{task_name}_vision'
+                env = manipulation.load(name, seed=task_kwargs['random'])
 
         self._env = env
         self.action_space = dmc_spec2gym_space(self._env.action_spec())
-
+        
         self.observation_space = dmc_spec2gym_space(
             self._env.observation_spec())
 

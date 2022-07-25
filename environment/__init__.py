@@ -5,3 +5,4 @@ from .mw_wrapper import MetaWorldEnv
 from .dmc_env import DMCEnv
 from .episode_monitor import EpisodeMonitor
 from .take_key import TakeKey
+from .video_recorder import VideoRecorder

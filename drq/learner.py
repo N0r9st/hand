@@ -96,7 +96,6 @@ def sample_actions(
 def update_critic(key: PRNGKey, actor: TrainState, critic: TrainState, target_critic: TrainState,
            temp: TrainState, batch: Batch, discount: float,
            backup_entropy: bool) -> Tuple[TrainState, InfoDict]:
-    # print(batch.next_observations)
     dist = actor(batch.next_observations)
     next_actions = dist.sample(seed=key)
     next_log_probs = dist.log_prob(next_actions)
