@@ -1,6 +1,6 @@
 import os
 import random
-
+import glob 
 os.environ['MUJOCO_GL']="egl"
 
 import numpy as np
@@ -26,8 +26,8 @@ flags.DEFINE_string('save_dir', './savings/', 'Dir with whatever is saved during
 flags.DEFINE_integer('seed', 42, 'Random seed.')
 flags.DEFINE_integer('eval_episodes', 10,
                      'Number of episodes used for evaluation.')
-flags.DEFINE_integer('log_interval', 200, 'Logging interval.') # /=5
-flags.DEFINE_integer('eval_interval', 1000, 'Eval interval.') # /=5
+flags.DEFINE_integer('log_interval', 500, 'Logging interval.') # /=5
+flags.DEFINE_integer('eval_interval', 2000, 'Eval interval.') # /=5
 flags.DEFINE_integer('batch_size', 512, 'Mini batch size.')
 flags.DEFINE_integer('max_steps', int(5e5), 'Number of environment steps.')
 flags.DEFINE_integer('start_training', int(1e3),
@@ -37,7 +37,7 @@ flags.DEFINE_integer(
     'Action repeat, if None, uses 2 or PlaNet default values.')
 flags.DEFINE_boolean('tqdm', True, 'Use tqdm progress bar.')
 flags.DEFINE_boolean('save_video', True, 'Save videos during evaluation.')
-flags.DEFINE_boolean('use_wandb', False, 'Save videos during evaluation.')
+flags.DEFINE_boolean('use_wandb', True, 'Save videos during evaluation.')
 config_flags.DEFINE_config_file(
     'config',
     'drq/drq_config.py',
@@ -56,10 +56,13 @@ PLANET_ACTION_REPEAT = {
 
 
 def main(_):
-    
+    intermediate_vids_folder = "vids"
+    if FLAGS.use_wandb:
+        wandb.init(project='drq_test', config=FLAGS)
+        intermediate_vids_folder += '-' + wandb.run.name
     if FLAGS.save_video:
-        video_train_folder = os.path.join(FLAGS.save_dir, 'vids', 'train')
-        video_eval_folder = os.path.join(FLAGS.save_dir, 'vids', 'eval')
+        video_train_folder = os.path.join(FLAGS.save_dir, intermediate_vids_folder, 'train')
+        video_eval_folder = os.path.join(FLAGS.save_dir, intermediate_vids_folder, 'eval')
     else:
         video_train_folder = None
         video_eval_folder = None
@@ -102,9 +105,6 @@ def main(_):
     eval_returns = []
     observation, done = env.reset(), False
 
-    if FLAGS.use_wandb:
-        wandb.init(project='drq_test', config=FLAGS)
-
     for i in tqdm.tqdm(range(1, FLAGS.max_steps // action_repeat + 1),
                        smoothing=0.1,
                        disable=not FLAGS.tqdm):
@@ -126,7 +126,7 @@ def main(_):
         if done:
             observation, done = env.reset(), False
             if FLAGS.use_wandb:
-                wandb.log({f'training/{k}': v for k, v in info['episode'].items()})
+                wandb.log({f'training/{k}': v for k, v in info['episode'].items()}, step=i)
 
         if i >= FLAGS.start_training:
             batch = replay_buffer.sample(FLAGS.batch_size)
@@ -134,13 +134,18 @@ def main(_):
 
             if i % FLAGS.log_interval == 0:
                 if FLAGS.use_wandb:
-                    wandb.log({f'training/{k}': v for k, v in update_info.items()})
+                    wandb.log({f'training/{k}': v for k, v in update_info.items()}, step=i)
 
 
         if i % FLAGS.eval_interval == 0:
             eval_stats = evaluate(agent, eval_env, FLAGS.eval_episodes)
             if FLAGS.use_wandb:
-                wandb.log({f'evaluation/{k}': v for k, v in eval_stats.items()})
+                wandb.log({f'evaluation/{k}': v for k, v in eval_stats.items()}, step=i)
+                vid_paths = glob.glob(os.path.join(video_eval_folder, "*.mp4"))
+                vid_paths = sorted(
+                    vid_paths, key=lambda x: int(os.path.basename(x).split(".")[0])
+                )
+                if vid_paths: wandb.log({"video": wandb.Video(vid_paths[-1], fps=24, format="mp4")})
 
             eval_returns.append(
                 (info['total']['timesteps'], eval_stats['return']))
