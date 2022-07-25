@@ -1,0 +1,8 @@
+**.ipynb
+**.egg-info
+**/__pycache__
+**.egg_enfo
+**test.py
+savings/
+tmp/
+wandb/
