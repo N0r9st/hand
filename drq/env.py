@@ -4,6 +4,9 @@ import environment as wrappers
 import gym
 from gym.wrappers import RescaleAction
 from gym.wrappers.pixel_observation import PixelObservationWrapper
+import metaworld
+from environment import MetaWorldEnv
+import random
 
 
 def make_env(env_name: str,
@@ -25,6 +28,13 @@ def make_env(env_name: str,
     env_ids = [env_spec.id for env_spec in all_envs]
     if env_name in env_ids:
         env = gym.make(env_name)
+    elif 'metaworld' in env_name:
+        mw_name = '-'.join(env_name.split('-')[1:])
+        ml1 = metaworld.ML1(mw_name) # Construct the benchmark, sampling tasks
+        env = ml1.train_classes[mw_name]()  # Create an environment with task `pick_place`
+        task = random.choice(ml1.train_tasks)
+        env.set_task(task)  # Set task
+        env = MetaWorldEnv(env, [3, 5], width=image_size, height=image_size)
     else:
         domain_name, task_name = env_name.split('-')
         env = wrappers.DMCEnv(domain_name=domain_name,
@@ -41,26 +51,26 @@ def make_env(env_name: str,
         env = wrappers.RepeatAction(env, action_repeat)
 
     env = RescaleAction(env, -1.0, 1.0)
-
-    if from_pixels:
-        if env_name in env_ids:
-            camera_id = 0
+    if not ('metaworld' in env_name):
+        if from_pixels:
+            if env_name in env_ids:
+                camera_id = 0
+            else:
+                camera_id = 2 if domain_name == 'quadruped' else 0
+            env = PixelObservationWrapper(env,
+                                        pixels_only=pixels_only,
+                                        render_kwargs={
+                                            'pixels': {
+                                                'height': image_size,
+                                                'width': image_size,
+                                                'camera_id': camera_id
+                                            }
+                                        })
+            env = wrappers.TakeKey(env, take_key='pixels')
+            if gray_scale:
+                env = wrappers.RGB2Gray(env)
         else:
-            camera_id = 2 if domain_name == 'quadruped' else 0
-        env = PixelObservationWrapper(env,
-                                      pixels_only=pixels_only,
-                                      render_kwargs={
-                                          'pixels': {
-                                              'height': image_size,
-                                              'width': image_size,
-                                              'camera_id': camera_id
-                                          }
-                                      })
-        env = wrappers.TakeKey(env, take_key='pixels')
-        if gray_scale:
-            env = wrappers.RGB2Gray(env)
-    else:
-        env = wrappers.SinglePrecision(env)
+            env = wrappers.SinglePrecision(env)
 
     if save_folder is not None:
         # env = gym.wrappers.RecordVideo(env, save_folder)

@@ -19,14 +19,14 @@ class VideoRecorder(gym.Wrapper):
 
     def step(self, action: np.ndarray):
         obs, reward, done, info = self.env.step(action)
-        self.images.append(obs)
+        self.images.append(obs[:, :, :3])
         return obs, reward, done, info
     
     def reset(self):
         if self.reset_count%self.save_every == 0 and self.images:
             self.save_video(self.images)
         obs = self.env.reset()
-        self.images = [obs]
+        self.images = [obs[:, :, :3]]
         self.reset_count += 1
         return obs
 

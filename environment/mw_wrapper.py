@@ -72,7 +72,7 @@ all_cameras = [camera_0, camera_1, camera_2, camera_3, camera_4, camera_5, camer
 
 
 class MetaWorldEnv(gym.Env, ABC):
-    def __init__(self, env, cameras, from_pixels=True, height=100, width=100, channels_first=True):
+    def __init__(self, env, cameras, from_pixels=True, height=100, width=100, channels_first=False):
         self._env = env
         self.cameras = cameras
         self.from_pixels = from_pixels

@@ -7,7 +7,7 @@ from typing import Dict, Optional, OrderedDict
 
 import dm_env
 import numpy as np
-from dm_control import suite, manipulation
+from dm_control import manipulation, suite
 from gym import core, spaces
 
 
