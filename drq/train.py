@@ -1,21 +1,20 @@
-import subprocess
+import glob
 import os
 import random
-import glob 
+import subprocess
+
 os.environ['MUJOCO_GL']="egl"
 
 import numpy as np
 import tqdm
+import wandb
 from absl import app, flags
 from ml_collections import config_flags
-import wandb
 
-
-from drq.learner import DrQLearner
 from drq.buffer import ReplayBuffer
-from drq.evaluation import evaluate
 from drq.dm_env_wrapper import make_env
-
+from drq.evaluation import evaluate
+from drq.learner import DrQLearner
 
 # NOTE: set LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
 
@@ -41,7 +40,7 @@ flags.DEFINE_boolean('save_video', True, 'Save videos during evaluation.')
 flags.DEFINE_boolean('use_wandb', True, 'Save videos during evaluation.')
 config_flags.DEFINE_config_file(
     'config',
-    'drq/drq_config.py',
+    'drq/config.py',
     'File path to the training hyperparameter configuration.',
     lock_config=False)
 

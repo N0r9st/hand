@@ -1,17 +1,10 @@
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
 import gym
 import numpy as np
-
-import collections
-from typing import Tuple, Union
-
-import numpy as np
 from tqdm import tqdm
 
-Batch = collections.namedtuple(
-    'Batch',
-    ['observations', 'actions', 'rewards', 'masks', 'next_observations'])
+from drq.common import Batch
 
 
 def split_into_trajectories(observations, actions, rewards, masks, dones_float,

@@ -1,4 +1,4 @@
-from typing import Tuple, Dict
+from typing import Dict, Tuple
 
 import jax.numpy as jnp
 from flax import linen as nn
@@ -17,7 +17,7 @@ class Temperature(nn.Module):
         return jnp.exp(log_temp)
 
 
-def update(temp: TrainState, entropy: float,
+def update_temperature(temp: TrainState, entropy: float,
            target_entropy: float) -> Tuple[TrainState, InfoDict]:
 
     def temperature_loss_fn(temp_params):

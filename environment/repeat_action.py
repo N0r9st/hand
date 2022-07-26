@@ -2,15 +2,13 @@ import gym
 from typing import Tuple
 import numpy as np
 
-TimeStep = Tuple[np.ndarray, float, bool, dict]
-
 class RepeatAction(gym.Wrapper):
 
     def __init__(self, env, action_repeat=4):
         super().__init__(env)
         self._action_repeat = action_repeat
 
-    def step(self, action: np.ndarray) -> TimeStep:
+    def step(self, action: np.ndarray):
         total_reward = 0.0
         done = None
         combined_info = {}

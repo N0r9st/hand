@@ -1,17 +1,16 @@
+import os
+import subprocess
+from pathlib import Path
+
+import cv2
 import gym
 import numpy as np
-import subprocess
-import os
-from pathlib import Path
-import cv2
+
 
 class VideoRecorder(gym.Wrapper):
-
     def __init__(self, env, video_folder, save_every, ffmpeg=False):
         super().__init__(env)
-
         Path(video_folder).mkdir(parents=True, exist_ok=True)
-
         self.images = []
         self.reset_count = 0
         self.ffmpeg = ffmpeg
@@ -19,16 +18,13 @@ class VideoRecorder(gym.Wrapper):
         self.save_every = save_every
 
     def step(self, action: np.ndarray):
-
         obs, reward, done, info = self.env.step(action)
         self.images.append(obs)
         return obs, reward, done, info
     
     def reset(self):
-
         if self.reset_count%self.save_every == 0 and self.images:
             self.save_video(self.images)
-            
         obs = self.env.reset()
         self.images = [obs]
         self.reset_count += 1

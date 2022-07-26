@@ -1,6 +1,5 @@
 from typing import Dict
 
-import flax.linen as nn
 import gym
 import numpy as np
 

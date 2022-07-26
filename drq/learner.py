@@ -1,125 +1,16 @@
-"""Implementations of algorithms for continuous control."""
-
 import functools
-from typing import Optional, Sequence, Tuple, Any, Callable, Dict, Union
-import collections
-from chex import params_product
+from typing import Optional, Sequence, Tuple
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from drq.models import DrQDoubleCritic, DrQPolicy
-import drq.temperature as temperature
-from flax.training.train_state import TrainState as TrainStateOld
 
-InfoDict = Dict[str, float]
+from drq.common import Batch, InfoDict, PRNGKey
+from drq.models import (DrQDoubleCritic, DrQPolicy, Temperature, TrainState,
+                        sample_actions, update_actor, update_critic,
+                        update_temperature)
 
-
-import jax
-import jax.numpy as jnp
-import flax
-
-Params = Any
-
-class TrainState(TrainStateOld):
-    def __call__(self, *args: Any, **kwds: Any) -> Any:
-        return self.apply_fn({'params': self.params}, *args, **kwds)
-
-    def apply_gradient(
-            self,
-            loss_fn: Optional[Callable[[Params], Any]] = None,
-            grads: Optional[Any] = None,
-            has_aux: bool = True):
-        assert (loss_fn is not None or grads is not None,
-                'Either a loss function or grads must be specified.')
-        if grads is None:
-            grad_fn = jax.grad(loss_fn, has_aux=has_aux)
-            if has_aux:
-                grads, aux = grad_fn(self.params)
-            else:
-                grads = grad_fn(self.params)
-        else:
-            assert (has_aux,
-                    'When grads are provided, expects no aux outputs.')
-
-        updates, new_opt_state = self.tx.update(grads, self.opt_state,
-                                                self.params)
-        new_params = optax.apply_updates(self.params, updates)
-
-        new_model = self.replace(step=self.step + 1,
-                                 params=new_params,
-                                 opt_state=new_opt_state)
-        if has_aux:
-            return new_model, aux
-        else:
-            return new_model
-
-
-Batch = collections.namedtuple(
-    'Batch',
-    ['observations', 'actions', 'rewards', 'masks', 'next_observations'])
-    
-Params = flax.core.FrozenDict[str, Any]
-PRNGKey = Any
-
-
-
-@functools.partial(jax.jit, static_argnames=('actor_apply_fn', 'distribution'))
-def _sample_actions(
-        rng: PRNGKey,
-        actor_apply_fn: Callable[..., Any],
-        actor_params: Params,
-        observations: np.ndarray,
-        temperature: float = 1.0,
-        distribution: str = 'log_prob') -> Tuple[PRNGKey, jnp.ndarray]:
-    if distribution == 'det':
-        return rng, actor_apply_fn({'params': actor_params}, observations,
-                                   temperature)
-    else:
-        dist = actor_apply_fn({'params': actor_params}, observations,
-                              temperature)
-        rng, key = jax.random.split(rng)
-        return rng, dist.sample(seed=key)
-
-
-def sample_actions(
-        rng: PRNGKey,
-        actor_apply_fn: Callable[..., Any],
-        actor_params: Params,
-        observations: np.ndarray,
-        temperature: float = 1.0,
-        distribution: str = 'log_prob') -> Tuple[PRNGKey, jnp.ndarray]:
-    return _sample_actions(rng, actor_apply_fn, actor_params, observations,
-                           temperature, distribution)
-
-
-def update_critic(key: PRNGKey, actor: TrainState, critic: TrainState, target_critic: TrainState,
-           temp: TrainState, batch: Batch, discount: float,
-           backup_entropy: bool) -> Tuple[TrainState, InfoDict]:
-    dist = actor(batch.next_observations)
-    next_actions = dist.sample(seed=key)
-    next_log_probs = dist.log_prob(next_actions)
-    next_q1, next_q2 = target_critic(batch.next_observations, next_actions)
-    next_q = jnp.minimum(next_q1, next_q2)
-
-    target_q = batch.rewards + discount * batch.masks * next_q
-
-    if backup_entropy:
-        target_q -= discount * batch.masks * temp() * next_log_probs
-
-    def critic_loss_fn(critic_params: Params) -> Tuple[jnp.ndarray, InfoDict]:
-        q1, q2 = critic.apply_fn({'params': critic_params}, batch.observations,
-                                 batch.actions)
-        critic_loss = ((q1 - target_q)**2 + (q2 - target_q)**2).mean()
-        return critic_loss, {
-            'critic_loss': critic_loss,
-            'q1': q1.mean(),
-            'q2': q2.mean()
-        }
-
-    new_critic, info = critic.apply_gradient(critic_loss_fn)
-
-    return new_critic, info
 
 def target_update(critic: TrainState, target_critic: TrainState, tau: float) -> TrainState:
     new_target_params = jax.tree_multimap(
@@ -127,27 +18,6 @@ def target_update(critic: TrainState, target_critic: TrainState, tau: float) -> 
         target_critic.params)
 
     return target_critic.replace(params=new_target_params)
-
-def update_actor(key: PRNGKey, actor: TrainState, critic: TrainState, temp: TrainState,
-           batch: Batch) -> Tuple[TrainState, InfoDict]:
-
-    def actor_loss_fn(actor_params: Params) -> Tuple[jnp.ndarray, InfoDict]:
-        dist = actor.apply_fn({'params': actor_params}, batch.observations)
-        actions = dist.sample(seed=key)
-        log_probs = dist.log_prob(actions)
-        q1, q2 = critic(batch.observations, actions)
-        q = jnp.minimum(q1, q2)
-        actor_loss = (log_probs * temp() - q).mean()
-        return actor_loss, {
-            'actor_loss': actor_loss,
-            'entropy': -log_probs.mean()
-        }
-
-    new_actor, info = actor.apply_gradient(actor_loss_fn)
-
-    return new_actor, info
-
-
 
 def random_crop(key, img, padding):
     crop_from = jax.random.randint(key, (2, ), 0, 2 * padding + 1)
@@ -198,7 +68,7 @@ def _update_jit(
 
     rng, key = jax.random.split(rng)
     new_actor, actor_info = update_actor(key, actor, new_critic, temp, batch)
-    new_temp, alpha_info = temperature.update(temp, actor_info['entropy'],
+    new_temp, alpha_info = update_temperature(temp, actor_info['entropy'],
                                               target_entropy)
 
     return rng, new_actor, new_critic, new_target_critic, new_temp, {
@@ -264,15 +134,14 @@ class DrQLearner(object):
         variables = critic_def.init(*[critic_key, observations, actions])
         _, params = variables.pop('params')                  
         target_critic = TrainState.create(
-            # critic_def, inputs=[critic_key, observations, actions])
             apply_fn=critic_def.apply, params=params, tx=optax.adam(learning_rate=critic_lr))
 
 
-        temp_def = temperature.Temperature(init_temperature)
+        temp_def = Temperature(init_temperature)
         variables = temp_def.init(temp_key)
         _, params = variables.pop('params') 
 
-        temp = TrainState.create(apply_fn=temperature.Temperature(init_temperature).apply,
+        temp = TrainState.create(apply_fn=Temperature(init_temperature).apply,
                             # inputs=[temp_key],
                             params=params,
                             tx=optax.adam(learning_rate=temp_lr))

@@ -1,5 +1,3 @@
-from curses import wrapper
-from textwrap import wrap
 from typing import Optional
 
 import gym
