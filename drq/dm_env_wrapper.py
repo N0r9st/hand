@@ -1,10 +1,10 @@
 from typing import Optional
 
+import environment as wrappers
 import gym
 from gym.wrappers import RescaleAction
 from gym.wrappers.pixel_observation import PixelObservationWrapper
 
-import environment as wrappers
 
 def make_env(env_name: str,
              seed: int,

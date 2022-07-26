@@ -45,4 +45,18 @@ class VideoRecorder(gym.Wrapper):
         if self.ffmpeg:
             subprocess.run(["ffmpeg", "-y", "-i", _filename, filename], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             os.remove(_filename)
+
+def video_from_images(filename, images, ffmpeg=True):
+    if ffmpeg:
+        first, second = os.path.splitext(filename)
+        _filename = first + '_' + second
+    else:
+        _filename = filename
+    out = cv2.VideoWriter(_filename, cv2.VideoWriter_fourcc(*'mp4v'), 30, images[0].shape[:2])
+    for frame in images:
+        out.write(frame)
+    out.release()
+    if ffmpeg:
+        subprocess.run(["ffmpeg", "-y", "-i", _filename, filename], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        os.remove(_filename)
         
