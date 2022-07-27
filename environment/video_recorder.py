@@ -59,4 +59,3 @@ def video_from_images(filename, images, ffmpeg=True):
     if ffmpeg:
         subprocess.run(["ffmpeg", "-y", "-i", _filename, filename], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         os.remove(_filename)
-        

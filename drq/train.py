@@ -38,7 +38,7 @@ flags.DEFINE_integer(
     'Action repeat, if None, uses 2 or PlaNet default values.')
 flags.DEFINE_boolean('tqdm', True, 'Use tqdm progress bar.')
 flags.DEFINE_boolean('save_video', True, 'Save videos during evaluation.')
-flags.DEFINE_boolean('use_wandb', False, 'Save videos during evaluation.')
+flags.DEFINE_boolean('use_wandb', True, 'Save videos during evaluation.')
 config_flags.DEFINE_config_file(
     'config',
     'drq/config.py',

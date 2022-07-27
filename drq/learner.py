@@ -114,36 +114,29 @@ class DrQLearner(object):
 
         actor_def = DrQPolicy(hidden_dims, action_dim, cnn_features,
                               cnn_strides, cnn_padding, latent_dim)
-        variables = actor_def.init(*[actor_key, observations])
-        _, params = variables.pop('params')
+        actor_params = actor_def.init(*[actor_key, observations])['params']
         actor = TrainState.create(apply_fn=actor_def.apply,
                              # inputs=[actor_key, observations],
-                             params=params,
+                             params=actor_params,
                              tx=optax.adam(learning_rate=actor_lr))
 
         critic_def = DrQDoubleCritic(hidden_dims, cnn_features, cnn_strides,
                                      cnn_padding, latent_dim)
-
-        variables = critic_def.init(*[critic_key, observations, actions])
-        _, params = variables.pop('params')
+        critic_params = critic_def.init(*[critic_key, observations, actions])['params']
         critic = TrainState.create(apply_fn=critic_def.apply,
                               # inputs=[critic_key, observations, actions],
-                              params=params,
+                              params=critic_params,
                               tx=optax.adam(learning_rate=critic_lr))
-
-        variables = critic_def.init(*[critic_key, observations, actions])
-        _, params = variables.pop('params')                  
+        target_critic_params = critic_def.init(*[critic_key, observations, actions])['params']
         target_critic = TrainState.create(
-            apply_fn=critic_def.apply, params=params, tx=optax.adam(learning_rate=critic_lr))
+            apply_fn=critic_def.apply, params=target_critic_params, tx=optax.adam(learning_rate=critic_lr))
 
 
         temp_def = Temperature(init_temperature)
-        variables = temp_def.init(temp_key)
-        _, params = variables.pop('params') 
-
+        temp_params = temp_def.init(temp_key)['params']
         temp = TrainState.create(apply_fn=Temperature(init_temperature).apply,
                             # inputs=[temp_key],
-                            params=params,
+                            params=temp_params,
                             tx=optax.adam(learning_rate=temp_lr))
 
         self.actor = actor
