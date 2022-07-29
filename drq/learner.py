@@ -27,25 +27,32 @@ def random_crop(key, img, padding):
     return jax.lax.dynamic_slice(padded_img, crop_from, img.shape)
 
 
-def batched_random_crop(key, imgs, padding=4):
+def batched_random_crop(key, imgs, padding):
     keys = jax.random.split(key, imgs.shape[0])
     return jax.vmap(random_crop, (0, 0, None))(keys, imgs, padding)
 
+def batched_random_crop_ntimes(key, imgs, n, padding=4):
+    keys = jax.random.split(key, n)
+    n_augs_imgs = jnp.repeat(imgs[jnp.newaxis, ...], repeats=n, axis=0)
+    return jax.vmap(batched_random_crop, in_axes=(0, 0, None))(keys, n_augs_imgs, padding)
 
-@functools.partial(jax.jit, static_argnames=('update_target'))
+@functools.partial(jax.jit, static_argnames=("update_target", "num_aug", "num_aug_target"))
 def _update_jit(
     rng: PRNGKey, actor: TrainState, critic: TrainState, target_critic: TrainState,
     temp: TrainState, batch: Batch, discount: float, tau: float,
-    target_entropy: float, update_target: bool
+    target_entropy: float, update_target: bool, num_aug: int, num_aug_target: int
 ) -> Tuple[PRNGKey, TrainState, TrainState, TrainState, TrainState, InfoDict]:
 
     rng, key = jax.random.split(rng)
-    observations = batched_random_crop(key, batch.observations)
+    # observations = batched_random_crop(key, batch.observations)
+    m_observations = batched_random_crop_ntimes(key, batch.observations, n=num_aug)
+    
     rng, key = jax.random.split(rng)
-    next_observations = batched_random_crop(key, batch.next_observations)
+    # next_observations = batched_random_crop(key, batch.next_observations)
+    k_next_observations = batched_random_crop_ntimes(key, batch.next_observations, n=num_aug_target)
 
-    batch = batch._replace(observations=observations,
-                           next_observations=next_observations)
+    batch = batch._replace(observations=m_observations,
+                           next_observations=k_next_observations)
 
     rng, key = jax.random.split(rng)
     new_critic, critic_info = update_critic(key,
@@ -96,7 +103,9 @@ class DrQLearner(object):
                  tau: float = 0.005,
                  target_update_period: int = 1,
                  target_entropy: Optional[float] = None,
-                 init_temperature: float = 0.1):
+                 init_temperature: float = 0.1,
+                 num_aug: int = 1,
+                 num_aug_target: int = 1):
 
         action_dim = actions.shape[-1]
 
@@ -112,19 +121,19 @@ class DrQLearner(object):
         rng = jax.random.PRNGKey(seed)
         rng, actor_key, critic_key, temp_key = jax.random.split(rng, 4)
 
+
         actor_def = DrQPolicy(hidden_dims, action_dim, cnn_features,
                               cnn_strides, cnn_padding, latent_dim)
         actor_params = actor_def.init(*[actor_key, observations])['params']
         actor = TrainState.create(apply_fn=actor_def.apply,
-                             # inputs=[actor_key, observations],
                              params=actor_params,
                              tx=optax.adam(learning_rate=actor_lr))
+
 
         critic_def = DrQDoubleCritic(hidden_dims, cnn_features, cnn_strides,
                                      cnn_padding, latent_dim)
         critic_params = critic_def.init(*[critic_key, observations, actions])['params']
         critic = TrainState.create(apply_fn=critic_def.apply,
-                              # inputs=[critic_key, observations, actions],
                               params=critic_params,
                               tx=optax.adam(learning_rate=critic_lr))
         target_critic_params = critic_def.init(*[critic_key, observations, actions])['params']
@@ -134,8 +143,7 @@ class DrQLearner(object):
 
         temp_def = Temperature(init_temperature)
         temp_params = temp_def.init(temp_key)['params']
-        temp = TrainState.create(apply_fn=Temperature(init_temperature).apply,
-                            # inputs=[temp_key],
+        temp = TrainState.create(apply_fn=temp_def.apply,
                             params=temp_params,
                             tx=optax.adam(learning_rate=temp_lr))
 
@@ -145,6 +153,8 @@ class DrQLearner(object):
         self.temp = temp
         self.rng = rng
         self.step = 0
+        self.num_aug = num_aug
+        self.num_aug_target = num_aug_target
 
     def sample_actions(self,
                        observations: np.ndarray,
@@ -163,7 +173,7 @@ class DrQLearner(object):
         new_rng, new_actor, new_critic, new_target_critic, new_temp, info = _update_jit(
             self.rng, self.actor, self.critic, self.target_critic, self.temp,
             batch, self.discount, self.tau, self.target_entropy,
-            self.step % self.target_update_period == 0)
+            self.step % self.target_update_period == 0, self.num_aug, self.num_aug_target)
 
         self.rng = new_rng
         self.actor = new_actor

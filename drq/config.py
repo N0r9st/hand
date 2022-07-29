@@ -30,4 +30,7 @@ def get_config():
     config.gray_scale = False
     config.image_size = 84
 
+    config.num_aug = 2
+    config.num_aug_target = 2
+
     return config

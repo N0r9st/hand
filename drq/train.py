@@ -22,7 +22,8 @@ FLAGS = flags.FLAGS
 
 # flags.DEFINE_string('env_name', 'cheetah-run', 'Environment name.')
 # flags.DEFINE_string('env_name', 'lift-brick', 'Environment name.')
-flags.DEFINE_string('env_name', 'metaworld-pick-place-v2', 'Environment name.')
+# flags.DEFINE_string('env_name', 'metaworld-pick-place-v2', 'Environment name.')
+flags.DEFINE_string('env_name', 'reach-duplo', 'Environment name.')
 flags.DEFINE_string('save_dir', './savings/', 'Dir with whatever is saved during run')
 flags.DEFINE_integer('seed', 42, 'Random seed.')
 flags.DEFINE_integer('eval_episodes', 10,
@@ -38,7 +39,7 @@ flags.DEFINE_integer(
     'Action repeat, if None, uses 2 or PlaNet default values.')
 flags.DEFINE_boolean('tqdm', True, 'Use tqdm progress bar.')
 flags.DEFINE_boolean('save_video', True, 'Save videos during evaluation.')
-flags.DEFINE_boolean('use_wandb', True, 'Save videos during evaluation.')
+flags.DEFINE_boolean('use_wandb', False, 'Save videos during evaluation.')
 config_flags.DEFINE_config_file(
     'config',
     'drq/config.py',

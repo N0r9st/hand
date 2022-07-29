@@ -126,11 +126,14 @@ def sample_actions(
 def update_actor(key: PRNGKey, actor: TrainState, critic: TrainState, temp: TrainState,
            batch: Batch) -> Tuple[TrainState, InfoDict]:
 
+    m_repeats, batch_size, *dims = batch.observations.shape
+    observations = batch.observations.reshape((m_repeats*batch_size, *dims))
+
     def actor_loss_fn(actor_params: Params) -> Tuple[jnp.ndarray, InfoDict]:
-        dist = actor.apply_fn({'params': actor_params}, batch.observations)
+        dist = actor.apply_fn({'params': actor_params}, observations)
         actions = dist.sample(seed=key)
         log_probs = dist.log_prob(actions)
-        q1, q2 = critic(batch.observations, actions)
+        q1, q2 = critic(observations, actions)
         q = jnp.minimum(q1, q2)
         actor_loss = (log_probs * temp() - q).mean()
         return actor_loss, {

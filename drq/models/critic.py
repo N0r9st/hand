@@ -1,6 +1,7 @@
 from typing import Callable, Sequence, Tuple
 
 import flax.linen as nn
+import jax
 import jax.numpy as jnp
 from drq.common import Batch, InfoDict, Params, PRNGKey
 from drq.models.base import MLP, Encoder, TrainState
@@ -59,25 +60,40 @@ class DrQDoubleCritic(nn.Module):
 
         return DoubleCritic(self.hidden_dims)(x, actions)
 
+def get_target(next_observations, rewards, masks, key, actor, target_critic, temp, discount, backup_entropy):
+    dist = actor(next_observations)
+    next_actions = dist.sample(seed=key)
+    next_log_probs = dist.log_prob(next_actions)
+    next_q1, next_q2 = target_critic(next_observations, next_actions)
+    next_q = jnp.minimum(next_q1, next_q2)
+
+    target_q = rewards + discount * masks * next_q
+
+    if backup_entropy:
+        target_q -= discount * masks * temp() * next_log_probs
+
+    return target_q
+
+
+def get_target_from_n_augments(batch: Batch, key, actor, target_critic, temp, discount, backup_entropy):
+    keys = jax.random.split(key, batch.next_observations.shape[0])
+    return jax.vmap(get_target, in_axes=(0, None, None, 0, None, None, None, None, None))(
+        batch.next_observations, batch.rewards, batch.masks, keys, actor, target_critic, temp, discount, backup_entropy
+    ).mean(0)
+
 
 
 def update_critic(key: PRNGKey, actor: TrainState, critic: TrainState, target_critic: TrainState,
            temp: TrainState, batch: Batch, discount: float,
            backup_entropy: bool) -> Tuple[TrainState, InfoDict]:
-    dist = actor(batch.next_observations)
-    next_actions = dist.sample(seed=key)
-    next_log_probs = dist.log_prob(next_actions)
-    next_q1, next_q2 = target_critic(batch.next_observations, next_actions)
-    next_q = jnp.minimum(next_q1, next_q2)
 
-    target_q = batch.rewards + discount * batch.masks * next_q
-
-    if backup_entropy:
-        target_q -= discount * batch.masks * temp() * next_log_probs
+    target_q = get_target_from_n_augments(batch, key, actor, target_critic, temp, discount, backup_entropy)
+    m_repeats, batch_size, *dims = batch.observations.shape
+    target_q = jnp.repeat(target_q, repeats=m_repeats, axis=0)
 
     def critic_loss_fn(critic_params: Params) -> Tuple[jnp.ndarray, InfoDict]:
-        q1, q2 = critic.apply_fn({'params': critic_params}, batch.observations,
-                                 batch.actions)
+        q1, q2 = critic.apply_fn({'params': critic_params}, batch.observations.reshape((m_repeats*batch_size, *dims)),
+                                        jnp.repeat(batch.actions, repeats=m_repeats, axis=0))
         critic_loss = ((q1 - target_q)**2 + (q2 - target_q)**2).mean()
         return critic_loss, {
             'critic_loss': critic_loss,
