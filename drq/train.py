@@ -20,10 +20,7 @@ from drq.learner import DrQLearner
 
 FLAGS = flags.FLAGS
 
-# flags.DEFINE_string('env_name', 'cheetah-run', 'Environment name.')
-# flags.DEFINE_string('env_name', 'lift-brick', 'Environment name.')
-flags.DEFINE_string('env_name', 'metaworld-pick-place-v2', 'Environment name.')
-# flags.DEFINE_string('env_name', 'reach-duplo', 'Environment name.')
+flags.DEFINE_string('env_name', 'cheetah-run', 'Environment name.')
 flags.DEFINE_string('save_dir', './savings/', 'Dir with whatever is saved during run')
 flags.DEFINE_integer('seed', 42, 'Random seed.')
 flags.DEFINE_integer('eval_episodes', 10,

@@ -55,8 +55,7 @@ def video_from_images(filename, images, ffmpeg=True):
         _filename = filename
     out = cv2.VideoWriter(_filename, cv2.VideoWriter_fourcc(*'mp4v'), 30, images[0].shape[:2])
     for frame in images:
-        if frame.shape[2]>3:
-            frame = frame[:, :, :3]
+        frame = frame[:, :, :3]
         out.write(frame)
     out.release()
     if ffmpeg:
