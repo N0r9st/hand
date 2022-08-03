@@ -64,7 +64,6 @@ class DMCEnv(core.Env):
 
         self._env = env
         self.action_space = dmc_spec2gym_space(self._env.action_spec())
-        
         self.observation_space = dmc_spec2gym_space(
             self._env.observation_spec())
 

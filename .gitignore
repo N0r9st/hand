@@ -6,3 +6,4 @@
 savings/
 tmp/
 wandb/
+**.ignore
