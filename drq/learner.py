@@ -13,7 +13,7 @@ from drq.models import (DrQDoubleCritic, DrQPolicy, Temperature, TrainState,
 
 
 def target_update(critic: TrainState, target_critic: TrainState, tau: float) -> TrainState:
-    new_target_params = jax.tree_multimap(
+    new_target_params = jax.tree_util.tree_map(
         lambda p, tp: p * tau + tp * (1 - tau), critic.params,
         target_critic.params)
 
