@@ -28,11 +28,16 @@ PLANET_ACTION_REPEAT = {
 
 
 def main(args):
+
     intermediate_vids_folder = "vids"
     
+    if args['wandb_project'] is not None:
+        wandb.init(project=args['wandb_project'], config=args)
+        intermediate_vids_folder += '-' + wandb.run.name
+
     video_train_folder = os.path.join(args['save_dir'], intermediate_vids_folder, 'train')
     video_eval_folder = os.path.join(args['save_dir'], intermediate_vids_folder, 'eval')
-
+    
     if args["action_repeat"] is not None:
         action_repeat = args['action_repeat']
     else:
@@ -69,10 +74,6 @@ def main(args):
 
     eval_returns = []
     observation, done = env.reset(), False
-
-    if args['wandb_project'] is not None:
-        wandb.init(project=args['wandb_project'], config=args)
-        intermediate_vids_folder += '-' + wandb.run.name
 
     for i in tqdm.tqdm(range(1, args["max_steps"] // action_repeat + 1),
                        smoothing=0.1,
